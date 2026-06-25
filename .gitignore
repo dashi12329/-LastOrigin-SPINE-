@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Unity AssetBundle binaries
+__data
+*.2dmodel_*
+*.unity3d
+
+# Output directories
+spine_editor/
+gifs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
