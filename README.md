@@ -1,6 +1,6 @@
 # Unity AssetBundle → Spine 3.8 转换工具
 
-将 Unity 2D 骨骼动画 AssetBundle 转换为 [Spine](http://zh.esotericsoftware.com/) 3.8 格式（`skeleton.json` + `skeleton.atlas`），支持 SkinnedMeshRenderer 和 SpriteRenderer，同时提供 GUI 工具和 GIF 导出。
+将 Unity 2D 骨骼动画 AssetBundle 转换为 [Spine](http://zh.esotericsoftware.com/) 3.8 格式（`skeleton.json` + `skeleton.atlas`），支持 SkinnedMeshRenderer 和 SpriteRenderer，同时提供 GUI 工具和 GIF 导出，本工具目前还是半成品，并且是由AI和我朋友的代码组成，还有不足的地方还希望各位能够帮忙进行完善和提交BUG。
 
 ## 功能
 
