@@ -906,8 +906,11 @@ class PreviewEngine:
         Uses GPU-accelerated rendering (OpenGL skinning + rasterization) when
         a GL context is active. Falls back to CPU cv2 rasterize otherwise.
         """
-        if self.scene is None or self.current_anim is None:
+        if self.scene is None:
             return np.zeros((self.H, self.W, 4), dtype=np.uint8)
+        # A bundle with no AnimationClip at all (a static prop/accessory)
+        # has no current_anim - still render its rest/bind pose rather
+        # than an empty frame.
 
         # Choose render resolution
         if target_w is not None:
@@ -972,7 +975,12 @@ class PreviewEngine:
         positions = skin_all(self.scene["parts"], world_fn)
         frame = rasterize(
             self.raster_cache, positions, to_canvas, W, H,
-            workers=1, opacities=opacities2,
+            # No current animation (a static prop/accessory) means
+            # _interpolate_cached_frame() has nothing cached and returns
+            # opacities2 = [] - rasterize() indexes opacities[i] per part,
+            # so an empty-but-not-None list would raise IndexError; treat
+            # it the same as "no override" (full opacity) instead.
+            workers=1, opacities=(opacities2 or None),
         )
         return frame
 
