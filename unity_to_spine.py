@@ -1270,6 +1270,13 @@ def load_scene(src: Path) -> list[tuple[str | None, dict[str, Any]]]:
             label = name or "(default)"
             print(f"  !! variant {label} skipped: {e}")
     if not scenes:
+        if not any(o.type.name == "Texture2D" for o in objs):
+            raise RuntimeError(
+                "no exportable variant found in this bundle: it has no "
+                "Texture2D objects at all - its atlas is stored in a "
+                "different AssetBundle this file depends on, which this "
+                "tool can't follow"
+            )
         raise RuntimeError("no exportable variant found in this bundle")
     return scenes
 
