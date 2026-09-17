@@ -186,7 +186,10 @@ class GPURenderer:
             # Compile shaders
             vs = gl_shaders.compileShader(_VERTEX_SHADER, gl.GL_VERTEX_SHADER)
             fs = gl_shaders.compileShader(_FRAGMENT_SHADER, gl.GL_FRAGMENT_SHADER)
-            self._shader_prog = gl_shaders.compileProgram(vs, fs)
+            # validate=False: glValidateProgram runs before any VAO/texture is
+            # bound, which some drivers spuriously fail even though the
+            # program links and runs fine. Linking is still checked below.
+            self._shader_prog = gl_shaders.compileProgram(vs, fs, validate=False)
             gl.glDeleteShader(vs)
             gl.glDeleteShader(fs)
 
