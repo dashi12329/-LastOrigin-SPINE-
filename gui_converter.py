@@ -1550,7 +1550,14 @@ class PreviewCanvas(QOpenGLWidget):
         Uses a frame version counter to skip re-rendering when the bone data
         hasn't changed (render thread produces frames slower than display refresh).
         """
-        if not self._gl_ready or not self.engine:
+        if not self._gl_ready or not self.engine or not self._use_gpu:
+            # CPU fallback mode: this must be a complete no-op. Any GL calls
+            # here (glClear, glDisable(GL_BLEND), ...) run on the same FBO
+            # that Qt's own QPainter compositing uses for paintEvent()'s
+            # drawImage() call right after this - leftover GL state from an
+            # unconditional glClear/glDisable(GL_BLEND) here can stop that
+            # image from showing up at all, producing a black canvas even
+            # though a valid frame was rendered and handed to QPainter.
             return
 
         # Skip if no new frame data since last paint AND view hasn't changed
