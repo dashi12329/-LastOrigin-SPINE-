@@ -553,6 +553,8 @@ class PreviewEngine:
 
     def __init__(self):
         self.scene: Optional[dict] = None
+        self.variants: list = []  # [(variant_name_or_None, scene_dict), ...] from load_scene()
+        self.variant_index: int = 0
         self.skel: Optional[dict] = None
         self.bones: list = []
         self.tr_name: dict = {}
@@ -592,9 +594,18 @@ class PreviewEngine:
         self._gpu_skeleton_lines: list = []
         self._gpu_frame_version: int = 0  # incremented each time data is updated
 
-    def load_bundle(self, src: Path) -> str:
-        """Load a Unity bundle and prepare for preview."""
-        scene = load_scene(src)
+    def load_bundle(self, src: Path, variant_index: int = 0) -> str:
+        """Load a Unity bundle and prepare for preview.
+
+        A bundle may pack several skins (N, NS1, NS2, ...) into one file;
+        load_scene() returns one (name, scene) pair per skin. The preview
+        can only show one at a time, so this shows `variant_index` (the
+        first by default) and reports how many others were found.
+        """
+        scenes = load_scene(src)
+        self.variants = scenes
+        self.variant_index = variant_index
+        variant_name, scene = scenes[variant_index]
         self.scene = scene
         self.atlases = scene["atlases"]
         self.parts = scene["parts"]
@@ -695,6 +706,9 @@ class PreviewEngine:
 
         msg = (f"骨骼: {len(bones)}  插槽: {len(slots)}  "
                f"动画: {len(animations)}  版本: {SPINE_VERSION}")
+        if len(scenes) > 1:
+            names = "、".join((n or "?") for n, _ in scenes)
+            msg += f"  [此文件含 {len(scenes)} 套皮肤: {names}；当前预览: {variant_name or '(默认)'}]"
         return msg
 
     def _pre_sample_animation(self, scene: dict, clip) -> dict:
@@ -1031,17 +1045,21 @@ class ConvertWorker(QThread):
     def run(self):
         try:
             self.progress.emit(f"正在加载: {self.src}")
-            scene = load_scene(self.src)
+            scenes = load_scene(self.src)
 
             # Determine output
             if self.output_dir:
-                out = self.output_dir
+                out_base = self.output_dir
             else:
                 parent = self.src.parent if self.src.is_file() else self.src.parent
-                out = parent / ("spine_editor" if self.editor else "spine")
+                out_base = parent / ("spine_editor" if self.editor else "spine")
 
-            self.progress.emit(f"正在导出到: {out}")
-            export_spine(scene, out, editor=self.editor)
+            if len(scenes) > 1:
+                self.progress.emit(f"检测到 {len(scenes)} 套皮肤，分别导出到子文件夹")
+            for variant_name, scene in scenes:
+                out = out_base / variant_name if variant_name else out_base
+                self.progress.emit(f"正在导出到: {out}")
+                export_spine(scene, out, editor=self.editor)
 
             # Create preview engine
             engine = PreviewEngine()
@@ -1049,7 +1067,7 @@ class ConvertWorker(QThread):
             self.progress.emit(f"预览就绪: {msg}")
             self.preview_ready.emit(engine)
 
-            self.finished_signal.emit(True, f"导出成功: {out}")
+            self.finished_signal.emit(True, f"导出成功: {out_base}")
         except Exception as e:
             self.progress.emit(f"错误: {e}")
             traceback.print_exc()
@@ -1097,20 +1115,24 @@ class BatchConvertWorker(QThread):
             self.file_progress.emit(i + 1, total)
             try:
                 self.progress.emit(f"[{i + 1}/{total}] 正在处理: {src}")
-                scene = load_scene(src)
-                # Use the atlas texture base name (e.g. "3P_BlackWyrm_NS1")
-                # as the folder name. If duplicate, append _2, _3, etc.
-                base_name = self._atlas_base_name(scene)
-                if base_name in used_names:
-                    used_names[base_name] += 1
-                    folder_name = f"{base_name}_{used_names[base_name]}"
-                else:
-                    used_names[base_name] = 1
-                    folder_name = base_name
+                scenes = load_scene(src)
+                # A bundle may pack several skins into one file; each gets
+                # its own folder. Prefer the skin's own name when the file
+                # was split, otherwise fall back to the atlas texture base
+                # name (e.g. "3P_BlackWyrm_NS1") as before. Duplicate names
+                # get _2, _3, etc.
+                for variant_name, scene in scenes:
+                    base_name = variant_name or self._atlas_base_name(scene)
+                    if base_name in used_names:
+                        used_names[base_name] += 1
+                        folder_name = f"{base_name}_{used_names[base_name]}"
+                    else:
+                        used_names[base_name] = 1
+                        folder_name = base_name
 
-                out = self.output_base / folder_name
-                export_spine(scene, out, editor=self.editor)
-                self.progress.emit(f"[{i + 1}/{total}] 完成: {src.name} -> {folder_name}/")
+                    out = self.output_base / folder_name
+                    export_spine(scene, out, editor=self.editor)
+                    self.progress.emit(f"[{i + 1}/{total}] 完成: {src.name} -> {folder_name}/")
                 success += 1
             except Exception as e:
                 self.progress.emit(f"[{i + 1}/{total}] 失败: {src} - {e}")
