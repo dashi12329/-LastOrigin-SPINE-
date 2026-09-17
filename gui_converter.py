@@ -1735,8 +1735,11 @@ class PreviewCanvas(QOpenGLWidget):
                     scx, scy = world_to_widget(cx, cy)
                     painter.drawLine(int(spx), int(spy), int(scx), int(scy))
                     painter.drawEllipse(int(scx) - 3, int(scy) - 3, 6, 6)
-        elif sk_lines and self.engine and self.engine.show_skeleton and not self._use_gpu:
-            # CPU path: skeleton lines are in canvas pixel space
+        elif self.engine and not self._use_gpu:
+            # CPU path: nothing else draws the frame (no custom GL calls run
+            # when GPU init failed), so the rendered image itself has to be
+            # drawn here too - it must NOT be gated on sk_lines/show_skeleton,
+            # those only control the optional bone overlay drawn on top of it.
             with self._render_lock:
                 frame_bgra = self._frame_bgra
             if frame_bgra is not None and frame_bgra.size > 0:
@@ -1754,17 +1757,18 @@ class PreviewCanvas(QOpenGLWidget):
                     dx, dy, dw, dh, scale = self._img_display_rect(iw_img, ih_img)
                     if dw > 0 and dh > 0:
                         painter.drawImage(QRectF(dx, dy, dw, dh), self._frame_qimage)
-                    scale_x = dw / iw_img
-                    scale_y = dh / ih_img
-                    painter.setPen(QPen(QColor(233, 69, 96, 180), 1.5))
-                    painter.setBrush(QBrush(QColor(233, 69, 96)))
-                    for (px, py, cx, cy) in sk_lines:
-                        spx = px * scale_x + dx
-                        spy = py * scale_y + dy
-                        scx = cx * scale_x + dx
-                        scy = cy * scale_y + dy
-                        painter.drawLine(int(spx), int(spy), int(scx), int(scy))
-                        painter.drawEllipse(int(scx) - 3, int(scy) - 3, 6, 6)
+                    if sk_lines and self.engine.show_skeleton:
+                        scale_x = dw / iw_img
+                        scale_y = dh / ih_img
+                        painter.setPen(QPen(QColor(233, 69, 96, 180), 1.5))
+                        painter.setBrush(QBrush(QColor(233, 69, 96)))
+                        for (px, py, cx, cy) in sk_lines:
+                            spx = px * scale_x + dx
+                            spy = py * scale_y + dy
+                            scx = cx * scale_x + dx
+                            scy = cy * scale_y + dy
+                            painter.drawLine(int(spx), int(spy), int(scx), int(scy))
+                            painter.drawEllipse(int(scx) - 3, int(scy) - 3, 6, 6)
 
         # Overlay text
         if self.engine and self.engine.current_anim:
